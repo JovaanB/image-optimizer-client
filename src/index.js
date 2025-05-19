@@ -27,12 +27,6 @@ export function processImage(mat, options = {}) {
     width: optimized.width,
     height: optimized.height,
     analysis,
-    indicators: {
-      blurScore: analysis.blurScore,
-      contrastScore: analysis.contrastScore,
-      isReadable: analysis.isReadable,
-      feedbacks: analysis.feedbacks,
-    },
     blob, // Pour téléchargement direct
   };
 }

@@ -43,12 +43,6 @@ mat.delete();
     feedbacks: ['L\'image semble floue'],
     isReadable: false
   },
-  indicators: {
-    blurScore: 123.4,
-    contrastScore: 45.6,
-    isReadable: false,
-    feedbacks: ['L\'image semble floue']
-  },
   blob: Blob // pour téléchargement
 }
 ```

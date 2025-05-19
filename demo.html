@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Démo image-optimizer-client</title>
+    <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2em;
+      }
+      #preview {
+        max-width: 300px;
+        max-height: 300px;
+        border: 1px solid #ccc;
+        margin-top: 1em;
+      }
+      #feedback {
+        margin-top: 1em;
+        color: #b00;
+      }
+      #scores {
+        margin-top: 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Démo Optimisation & Analyse d'image</h1>
+    <input type="file" id="fileInput" accept="image/*" />
+    <div>
+      <img id="preview" src="" alt="Aperçu optimisé" style="display: none" />
+    </div>
+    <div id="scores"></div>
+    <div id="feedback"></div>
+    <a
+      id="downloadLink"
+      href="#"
+      download="image-optimisee.jpg"
+      style="display: none; margin-top: 1em"
+      >Télécharger l'image optimisée</a
+    >
+    <script type="module">
+      (async () => {
+        cv = cv instanceof Promise ? await cv : cv;
+        const { processImage } = await import("./src/index.js");
+        const { loadImageToMat } = await import(
+          "./src/utils/loadImageToMat.js"
+        );
+
+        document
+          .getElementById("fileInput")
+          .addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById("feedback").textContent =
+              "Traitement en cours...";
+            const mat = await loadImageToMat(file);
+            try {
+              const { image, dataUrl, analysis, blob } = processImage(mat, {
+                grayscale: false,
+              });
+
+              console.log({ blob });
+
+              // Affichage
+              const img = document.getElementById("preview");
+              img.src = dataUrl;
+              img.style.display = "block";
+              document.getElementById("scores").innerHTML = `
+                <b>Score de flou :</b> ${analysis.blurScore.toFixed(1)}<br>
+                <b>Score de contraste :</b> ${analysis.contrastScore.toFixed(
+                  1
+                )}<br>
+              `;
+              document.getElementById("feedback").textContent = analysis
+                .feedbacks.length
+                ? analysis.feedbacks.join(" | ")
+                : "Image lisible ✔️";
+
+              // Taille de l'image avant et après
+              const originalSize = Math.round(file.size / 1024);
+              const optimizedSize = Math.round((dataUrl.length * 3) / 4 / 1024); // Base64 encoding
+              const sizeDiff = originalSize - optimizedSize;
+              const sizeDiffText = sizeDiff > 0 ? `(${sizeDiff} Ko)` : "";
+              document.getElementById("feedback").innerHTML += `
+                <br>
+                Taille originale : ${originalSize} Ko
+                </br>
+                Taille optimisée : ${optimizedSize} Ko 
+                <br>
+                ${sizeDiffText}
+              `;
+
+              // Lien de téléchargement
+              const downloadLink = document.getElementById("downloadLink");
+              downloadLink.href = URL.createObjectURL(blob);
+              downloadLink.style.display = "inline-block";
+            } finally {
+              mat.delete();
+            }
+          });
+      })();
+    </script>
+  </body>
+</html>

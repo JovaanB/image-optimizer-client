@@ -1,0 +1,21 @@
+{
+  "name": "image-optimizer-client",
+  "version": "0.1.0",
+  "description": "Librairie JS pour optimiser et analyser la lisibilité des images côté client avec OpenCV.js.",
+  "type": "module",
+  "main": "src/index.js",
+  "keywords": [
+    "opencv",
+    "image",
+    "optimizer",
+    "client",
+    "ecologie",
+    "compression",
+    "blur",
+    "contrast",
+    "ocr"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

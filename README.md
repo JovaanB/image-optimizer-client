@@ -1,6 +1,13 @@
 # image-optimizer-client
 
-Librairie JavaScript pour optimiser et analyser la lisibilité des images côté client avec OpenCV.js.
+Librairie JavaScript/TypeScript pour optimiser et analyser la lisibilité des images côté client avec OpenCV.js.
+
+## 🚀 Migration TypeScript
+
+- **Tout le code source est désormais en TypeScript** (`src/`)
+- **Typage strict** pour toutes les fonctions et structures de données
+- **Build automatique** dans `dist/` pour usage navigateur ES modules
+- **Démo** (`demo.html`) compatible avec les modules générés dans `dist/`
 
 ## Fonctionnalités principales
 
@@ -12,6 +19,7 @@ Librairie JavaScript pour optimiser et analyser la lisibilité des images côté
 - **Aperçu et export optimisé avant upload**
 - **Feedback utilisateur en direct**
 - **Téléchargement de l'image optimisée**
+- **Affichage des tailles originales et optimisées (px et Ko)**
 
 ## Démo rapide
 
@@ -20,12 +28,11 @@ Ouvrez `demo.html` dans un navigateur (avec un serveur local, ex : `python3 -m h
 ## Utilisation
 
 ```js
-import { processImage } from "./src/index.js";
-import { loadImageToMat } from "./src/utils/loadImageToMat.js";
+import { processImage } from "./dist/index.js";
+import { loadImageToMat } from "./dist/utils/loadImageToMat.js";
 
 const mat = await loadImageToMat(file);
 const result = processImage(mat, { grayscale: false });
-// result.dataUrl, result.analysis, result.blob, ...
 mat.delete();
 ```
 
@@ -43,7 +50,9 @@ mat.delete();
     feedbacks: ['L\'image semble floue'],
     isReadable: false
   },
-  blob: Blob // pour téléchargement
+  blob: Blob, // pour téléchargement
+  originalSizePx: { width: 2000, height: 3000 },
+  optimizedSizePx: { width: 1024, height: 1536 }
 }
 ```
 
@@ -53,7 +62,8 @@ mat.delete();
 
 ## Structure
 
-- `src/` : code source principal
+- `src/` : code source TypeScript
+- `dist/` : build JavaScript ES modules pour navigateur
 - `demo.html` : démo interactive
 
 ## Contribuer

@@ -42,9 +42,9 @@
     <script type="module">
       (async () => {
         cv = cv instanceof Promise ? await cv : cv;
-        const { processImage } = await import("./src/index.js");
+        const { processImage } = await import("./dist/index.js");
         const { loadImageToMat } = await import(
-          "./src/utils/loadImageToMat.js"
+          "./dist/utils/loadImageToMat.js"
         );
 
         document
@@ -56,37 +56,47 @@
               "Traitement en cours...";
             const mat = await loadImageToMat(file);
             try {
-              const { image, dataUrl, analysis, blob } = processImage(mat, {
+              const {
+                image,
+                dataUrl,
+                analysis,
+                blob,
+                result,
+                originalSizePx,
+                optimizedSizePx,
+              } = processImage(mat, {
                 grayscale: false,
               });
 
+              // Affichage
               const img = document.getElementById("preview");
               img.src = dataUrl;
               img.style.display = "block";
+
+              const originalSize = Math.round(file.size / 1024);
+              const optimizedSize = Math.round((dataUrl.length * 3) / 4 / 1024); // Base64 encoding
+              const sizeDiff = originalSize - optimizedSize;
+              const sizeDiffText = sizeDiff > 0 ? `(${sizeDiff} Ko)` : "";
+
               document.getElementById("scores").innerHTML = `
                 <b>Score de flou :</b> ${analysis.blurScore.toFixed(1)}<br>
                 <b>Score de contraste :</b> ${analysis.contrastScore.toFixed(
                   1
                 )}<br>
+                <b>Taille originale :</b> ${originalSizePx.width} x ${
+                originalSizePx.height
+              } px - ${originalSize} Ko<br>
+                <b>Taille optimisée :</b> ${optimizedSizePx.width} x ${
+                optimizedSizePx.height
+              } px - ${optimizedSize} Ko<br><br>   
+                <b>Différence de taille :</b> ${
+                  sizeDiff > 0 ? "-" : "+"
+                } ${Math.abs(sizeDiff)} Ko<br>
               `;
               document.getElementById("feedback").textContent = analysis
                 .feedbacks.length
                 ? analysis.feedbacks.join(" | ")
                 : "Image lisible ✔️";
-
-              // Taille de l'image avant et après
-              const originalSize = Math.round(file.size / 1024);
-              const optimizedSize = Math.round((dataUrl.length * 3) / 4 / 1024); // Base64 encoding
-              const sizeDiff = originalSize - optimizedSize;
-              const sizeDiffText = sizeDiff > 0 ? `(${sizeDiff} Ko)` : "";
-              document.getElementById("feedback").innerHTML += `
-                <br>
-                Taille originale : ${originalSize} Ko
-                </br>
-                Taille optimisée : ${optimizedSize} Ko 
-                <br>
-                ${sizeDiffText}
-              `;
 
               // Lien de téléchargement
               const downloadLink = document.getElementById("downloadLink");

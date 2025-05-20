@@ -1,20 +1,18 @@
-// Analyse globale de l'image : combine blur, contraste, zones vides
-// Retourne un objet avec scores et feedbacks
+/// <reference path="./opencv.d.ts" />
 import { detectBlur } from "./utils/detectBlur.js";
 import { detectContrast } from "./utils/detectContrast.js";
+import type { AnalyzeImageResult, ProcessImageOptions } from "./types";
 
-export function analyzeImage(mat, options = {}) {
+export function analyzeImage(
+  mat: cv.Mat,
+  options: ProcessImageOptions = {}
+): AnalyzeImageResult {
   if (!(mat instanceof cv.Mat)) throw new Error("Input must be a cv.Mat");
-  // Scores
   const blurScore = detectBlur(mat);
   const contrastScore = detectContrast(mat);
-
-  // Seuils empiriques (à ajuster selon besoin)
-  const blurThreshold = 100; // <100 = flou
-  const contrastThreshold = 20; // <20 = faible contraste
-
-  // Feedbacks
-  const feedbacks = [];
+  const blurThreshold = 100;
+  const contrastThreshold = 20;
+  const feedbacks: string[] = [];
   if (blurScore < blurThreshold) feedbacks.push("L'image semble floue");
   if (contrastScore < contrastThreshold)
     feedbacks.push("Contraste trop faible");

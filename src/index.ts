@@ -2,13 +2,44 @@
 import { optimizeImage } from "./utils/optimizeImage.js";
 import { analyzeImage } from "./analyzer.js";
 import type { ProcessImageResult, ProcessImageOptions } from "./types";
+import { computeSSIM_PSNR } from "./utils/controlQuality.js";
+import { DEFAULT_THRESHOLDS } from "./constants.js";
 
-export function processImage(
+/**
+ * Pipeline principal : optimise, analyse et contrôle la qualité d'une image OpenCV.
+ * @param mat Image OpenCV (cv.Mat)
+ * @param options Options d'optimisation et d'analyse (voir ProcessImageOptions)
+ * @returns Résultat complet (image optimisée, scores, feedbacks, etc.)
+ */
+export async function processImage(
   mat: cv.Mat,
   options: ProcessImageOptions = {}
-): ProcessImageResult {
-  const optimized = optimizeImage(mat, options);
-  const analysis = analyzeImage(optimized.matOptimized, options);
+): Promise<ProcessImageResult> {
+  // Fusionne options utilisateur et valeurs par défaut
+  const thresholds = {
+    minBlur: options.minBlur ?? DEFAULT_THRESHOLDS.minBlur,
+    minContrast: options.minContrast ?? DEFAULT_THRESHOLDS.minContrast,
+    minSSIM: options.minSSIM ?? DEFAULT_THRESHOLDS.minSSIM,
+    minPSNR: options.minPSNR ?? DEFAULT_THRESHOLDS.minPSNR,
+  };
+  // Optimisation (redimensionnement, compression, etc.)
+  const optimized = await optimizeImage(mat, options);
+
+  // Analyse qualité (flou, contraste) avec seuils dynamiques
+  const analysis = analyzeImage(optimized.matOptimized, {
+    minBlur: thresholds.minBlur,
+    minContrast: thresholds.minContrast,
+  });
+
+  // Calcul SSIM/PSNR avec seuils dynamiques
+  const { ssim, psnr } = computeSSIM_PSNR({
+    originalMat: mat,
+    optimizedMat: optimized.matOptimized,
+    minSSIM: thresholds.minSSIM,
+    minPSNR: thresholds.minPSNR,
+  });
+
+  // Conversion dataUrl -> Blob pour téléchargement
   function dataUrlToBlob(dataUrl: string): Blob {
     const arr = dataUrl.split(","),
       mime = arr[0].match(/:(.*?);/)![1];
@@ -26,18 +57,18 @@ export function processImage(
     width: optimized.width,
     height: optimized.height,
     analysis,
-    indicators: {
-      blurScore: analysis.blurScore,
-      contrastScore: analysis.contrastScore,
-      isReadable: analysis.isReadable,
-      feedbacks: analysis.feedbacks,
-    },
+    ssim,
+    psnr,
     blob,
     originalSizePx: { width: mat.cols, height: mat.rows },
     optimizedSizePx: {
-      width: optimized.matOptimized.cols,
-      height: optimized.matOptimized.rows,
+      width: optimized.width,
+      height: optimized.height,
     },
+    minBlur: thresholds.minBlur,
+    minContrast: thresholds.minContrast,
+    minSSIM: thresholds.minSSIM,
+    minPSNR: thresholds.minPSNR,
   };
 }
 

@@ -27,8 +27,28 @@
   <body>
     <h1>Démo Optimisation & Analyse d'image</h1>
     <input type="file" id="fileInput" accept="image/*" />
-    <div>
+    <div
+      style="display: flex; align-items: baseline; gap: 2em; margin-top: 1em"
+    >
       <img id="preview" src="" alt="Aperçu optimisé" style="display: none" />
+      <div style="display: flex; flex-direction: column; align-items: center">
+        <canvas
+          id="zoomCanvas"
+          width="100"
+          height="100"
+          style="border: 1px solid #ccc; display: none"
+        ></canvas>
+        <div
+          style="
+            font-size: 0.9em;
+            color: #555;
+            margin-top: 0.3em;
+            text-align: center;
+          "
+        >
+          Zoom au centre
+        </div>
+      </div>
     </div>
     <div id="scores"></div>
     <div id="feedback"></div>
@@ -39,6 +59,64 @@
       style="display: none; margin-top: 1em"
       >Télécharger l'image optimisée</a
     >
+    <div style="margin: 1em 0">
+      <label
+        >Largeur max (px):
+        <input
+          type="range"
+          id="maxWidth"
+          min="100"
+          max="3000"
+          value="1024"
+          step="1"
+        />
+        <span id="maxWidthValue">1024</span></label
+      ><br />
+      <label
+        >Hauteur max (px):
+        <input
+          type="range"
+          id="maxHeight"
+          min="100"
+          max="3000"
+          value="1024"
+          step="1"
+        />
+        <span id="maxHeightValue">1024</span></label
+      ><br />
+      <label
+        >Qualité JPEG:
+        <input
+          type="range"
+          id="quality"
+          min="0.1"
+          max="1"
+          value="0.7"
+          step="0.01"
+        />
+        <span id="qualityValue">0.7</span></label
+      ><br />
+      <label>
+        Facteur de zoom (x):
+        <input
+          type="range"
+          id="zoomFactor"
+          min="2"
+          max="30"
+          value="10"
+          step="1"
+        />
+        <span id="zoomFactorValue">10</span> </label
+      ><br />
+      <label>
+        Format d'export :
+        <select id="exportFormat">
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP</option>
+          <option value="image/png">PNG</option>
+        </select>
+      </label>
+    </div>
     <script type="module">
       (async () => {
         cv = cv instanceof Promise ? await cv : cv;
@@ -47,6 +125,256 @@
           "./dist/utils/loadImageToMat.js"
         );
 
+        // MAJ des valeurs sliders
+        const maxWidthInput = document.getElementById("maxWidth");
+        const maxHeightInput = document.getElementById("maxHeight");
+        const qualityInput = document.getElementById("quality");
+        const zoomFactorInput = document.getElementById("zoomFactor");
+        const exportFormatInput = document.getElementById("exportFormat");
+        const maxWidthValue = document.getElementById("maxWidthValue");
+        const maxHeightValue = document.getElementById("maxHeightValue");
+        const qualityValue = document.getElementById("qualityValue");
+        const zoomFactorValue = document.getElementById("zoomFactorValue");
+        maxWidthInput.addEventListener(
+          "input",
+          () => (maxWidthValue.textContent = maxWidthInput.value)
+        );
+        maxHeightInput.addEventListener(
+          "input",
+          () => (maxHeightValue.textContent = maxHeightInput.value)
+        );
+        qualityInput.addEventListener(
+          "input",
+          () => (qualityValue.textContent = qualityInput.value)
+        );
+        zoomFactorInput.addEventListener(
+          "input",
+          () => (zoomFactorValue.textContent = zoomFactorInput.value)
+        );
+
+        let lastFile = null;
+        let lastMat = null;
+        let lastResult = null;
+        async function processAndDisplay() {
+          if (!lastMat) return;
+          // Récupérer le format choisi
+          const exportFormat = exportFormatInput.value;
+          // Pipeline d'optimisation
+          const {
+            image,
+            dataUrl: defaultDataUrl,
+            analysis,
+            blob: defaultBlob,
+            originalSizePx,
+            optimizedSizePx,
+            ssim,
+            psnr,
+          } = await processImage(lastMat, {
+            grayscale: false,
+            maxWidth: parseInt(maxWidthInput.value, 10),
+            maxHeight: parseInt(maxHeightInput.value, 10),
+            quality: parseFloat(qualityInput.value),
+          });
+
+          maxWidthInput.max = originalSizePx.width;
+          maxHeightInput.max = originalSizePx.height;
+
+          // Générer le dataUrl et le blob dans le format choisi
+          let dataUrl = defaultDataUrl;
+          let blob = defaultBlob;
+          if (exportFormat !== "image/jpeg") {
+            // Recréer un canvas à partir de l'image optimisée
+            const tempImg = new window.Image();
+            tempImg.src = defaultDataUrl;
+            await new Promise((res) => (tempImg.onload = res));
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = tempImg.naturalWidth;
+            tempCanvas.height = tempImg.naturalHeight;
+            const tempCtx = tempCanvas.getContext("2d");
+            tempCtx.drawImage(tempImg, 0, 0);
+            dataUrl = tempCanvas.toDataURL(
+              exportFormat,
+              parseFloat(qualityInput.value)
+            );
+            blob = await new Promise((res) =>
+              tempCanvas.toBlob(
+                res,
+                exportFormat,
+                parseFloat(qualityInput.value)
+              )
+            );
+          }
+          lastResult = {
+            image,
+            dataUrl,
+            analysis,
+            blob,
+            originalSizePx,
+            optimizedSizePx,
+            ssim,
+            psnr,
+          };
+          // Affichage
+          const img = document.getElementById("preview");
+          img.src = dataUrl;
+          img.style.display = "block";
+          // Afficher le canvas de zoom dès qu'une image est disponible
+          const zoomCanvas = document.getElementById("zoomCanvas");
+          zoomCanvas.style.display = "block";
+
+          // Attendre que l'image soit chargée avant de dessiner le zoom
+          img.onload = () => {
+            if (zoomCanvas && img.naturalWidth && img.naturalHeight) {
+              const zoomCtx = zoomCanvas.getContext("2d");
+              const zoomFactor = parseInt(zoomFactorInput.value, 10);
+              // Taille du crop centré (en pixels natifs)
+              const cropWidth = Math.round(img.naturalWidth / zoomFactor);
+              const cropHeight = Math.round(img.naturalHeight / zoomFactor);
+              // Taille du canvas de zoom = taille affichée de l'image optimisée
+              const displayWidth = img.width;
+              const displayHeight = img.height;
+              zoomCanvas.width = displayWidth;
+              zoomCanvas.height = displayHeight;
+              // Centre du crop dans l'image optimisée
+              const cx = Math.floor(img.naturalWidth / 2);
+              const cy = Math.floor(img.naturalHeight / 2);
+              const tempCanvas = document.createElement("canvas");
+              tempCanvas.width = img.naturalWidth;
+              tempCanvas.height = img.naturalHeight;
+              const tempCtx = tempCanvas.getContext("2d");
+              tempCtx.drawImage(img, 0, 0);
+              const sx = Math.max(0, cx - Math.floor(cropWidth / 2));
+              const sy = Math.max(0, cy - Math.floor(cropHeight / 2));
+              zoomCtx.clearRect(0, 0, zoomCanvas.width, zoomCanvas.height);
+              zoomCtx.imageSmoothingEnabled = false;
+              zoomCtx.drawImage(
+                tempCanvas,
+                sx,
+                sy,
+                cropWidth,
+                cropHeight,
+                0,
+                0,
+                displayWidth,
+                displayHeight
+              );
+              zoomCanvas.style.border = "2px solid #333";
+              zoomCanvas.title = `Zoom x${zoomFactor} sur le centre (${cx},${cy})`;
+            }
+          };
+          // Résultats
+          const originalSize = Math.round(lastFile.size / 1024);
+          const optimizedSize = Math.round(blob.size / 1024);
+          const sizeDiff = originalSize - optimizedSize;
+          const diffColor = sizeDiff > 0 ? "#1a9c2c" : "#b00";
+
+          // Scores
+          document.getElementById("scores").innerHTML = `
+            <b>Score de flou :</b> ${analysis.blurScore.toFixed(1)}<br>
+            <b>Score de contraste :</b> ${analysis.contrastScore.toFixed(1)}<br>
+            <b>SSIM :</b> ${ssim !== undefined ? ssim.toFixed(4) : "N/A"}<br>
+            <b>PSNR :</b> ${
+              psnr !== undefined ? psnr.toFixed(2) + " dB" : "N/A"
+            }<br>
+            <b>Taille originale :</b> ${originalSizePx.width} x ${
+            originalSizePx.height
+          } px - ${originalSize} Ko<br>
+            <b>Taille optimisée :</b> ${optimizedSizePx.width} x ${
+            optimizedSizePx.height
+          } px - ${optimizedSize} Ko<br><br>
+            <span style="color: ${diffColor}; font-weight: bold; font-size: 1.2em; vertical-align: middle;">
+              ${sizeDiff > 0 ? "🟢" : "🔴"} ${Math.abs(sizeDiff)} Ko
+            </span>
+          `;
+
+          const feedbackColor =
+            analysis.feedbacks.length > 0 ? "#b00" : "#1a9c2c";
+          document.getElementById(
+            "feedback"
+          ).innerHTML = `<span style="color: ${feedbackColor}; font-weight: bold; font-size: 1.2em; vertical-align: middle;">
+                ${
+                  analysis.feedbacks.length
+                    ? analysis.feedbacks
+                        .map((feeback) => `🔴 ${feeback}`)
+                        .join(" | ")
+                    : "🟢 Image lisible"
+                }</span>`;
+          // Message d'alerte si les scores dépassent les seuils
+          let alertMsg = "";
+          // Utilise les seuils passés à processImage ou valeurs par défaut
+          const minBlurVal = 500;
+          const minContrastVal = 50;
+          const minSSIMVal = 0.9999;
+          const minPSNRVal = 35;
+          if (
+            typeof analysis.blurScore === "number" &&
+            typeof analysis.contrastScore === "number"
+          ) {
+            if (analysis.blurScore < minBlurVal) {
+              alertMsg += `⚠️ Flou trop élevé (score: ${analysis.blurScore.toFixed(
+                1
+              )} < seuil: ${minBlurVal})<br>`;
+            }
+            if (analysis.contrastScore < minContrastVal) {
+              alertMsg += `⚠️ Contraste trop faible (score: ${analysis.contrastScore.toFixed(
+                1
+              )} < seuil: ${minContrastVal})<br>`;
+            }
+          }
+          if (typeof ssim === "number" && typeof psnr === "number") {
+            if (ssim < minSSIMVal) {
+              alertMsg += `⚠️ SSIM trop bas (score: ${ssim.toFixed(
+                4
+              )} < seuil: ${minSSIMVal})<br>`;
+            }
+            if (psnr < minPSNRVal) {
+              alertMsg += `⚠️ PSNR trop bas (score: ${psnr.toFixed(
+                2
+              )} < seuil: ${minPSNRVal})<br>`;
+            }
+          }
+          if (alertMsg) {
+            document.getElementById(
+              "feedback"
+            ).innerHTML += `<div style='color:#b00;font-weight:bold;margin-top:0.5em;'>${alertMsg}</div>`;
+          }
+          // Lien de téléchargement
+          const downloadLink = document.getElementById("downloadLink");
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = `image-optimisee.${
+            exportFormat.split("/")[1]
+          }`;
+          downloadLink.style.display = "inline-block";
+        }
+
+        // Regroupe les sliders à surveiller
+        const sliderIds = [
+          "maxWidth",
+          "maxHeight",
+          "quality",
+          "zoomFactor",
+          "exportFormat",
+        ];
+        let processTimeout = null;
+        function debounceProcessAndDisplay() {
+          if (processTimeout !== null) {
+            clearTimeout(processTimeout);
+          }
+          processTimeout = window.setTimeout(() => {
+            processAndDisplay();
+            processTimeout = null;
+          }, 500);
+        }
+        sliderIds.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener(
+              el.tagName === "SELECT" ? "change" : "input",
+              debounceProcessAndDisplay
+            );
+          }
+        });
+
         document
           .getElementById("fileInput")
           .addEventListener("change", async (e) => {
@@ -54,57 +382,10 @@
             if (!file) return;
             document.getElementById("feedback").textContent =
               "Traitement en cours...";
-            const mat = await loadImageToMat(file);
-            try {
-              const {
-                image,
-                dataUrl,
-                analysis,
-                blob,
-                result,
-                originalSizePx,
-                optimizedSizePx,
-              } = processImage(mat, {
-                grayscale: false,
-              });
-
-              // Affichage
-              const img = document.getElementById("preview");
-              img.src = dataUrl;
-              img.style.display = "block";
-
-              const originalSize = Math.round(file.size / 1024);
-              const optimizedSize = Math.round((dataUrl.length * 3) / 4 / 1024); // Base64 encoding
-              const sizeDiff = originalSize - optimizedSize;
-              const sizeDiffText = sizeDiff > 0 ? `(${sizeDiff} Ko)` : "";
-
-              document.getElementById("scores").innerHTML = `
-                <b>Score de flou :</b> ${analysis.blurScore.toFixed(1)}<br>
-                <b>Score de contraste :</b> ${analysis.contrastScore.toFixed(
-                  1
-                )}<br>
-                <b>Taille originale :</b> ${originalSizePx.width} x ${
-                originalSizePx.height
-              } px - ${originalSize} Ko<br>
-                <b>Taille optimisée :</b> ${optimizedSizePx.width} x ${
-                optimizedSizePx.height
-              } px - ${optimizedSize} Ko<br><br>   
-                <b>Différence de taille :</b> ${
-                  sizeDiff > 0 ? "-" : "+"
-                } ${Math.abs(sizeDiff)} Ko<br>
-              `;
-              document.getElementById("feedback").textContent = analysis
-                .feedbacks.length
-                ? analysis.feedbacks.join(" | ")
-                : "Image lisible ✔️";
-
-              // Lien de téléchargement
-              const downloadLink = document.getElementById("downloadLink");
-              downloadLink.href = URL.createObjectURL(blob);
-              downloadLink.style.display = "inline-block";
-            } finally {
-              mat.delete();
-            }
+            if (lastMat) lastMat.delete();
+            lastFile = file;
+            lastMat = await loadImageToMat(file);
+            await processAndDisplay();
           });
       })();
     </script>

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Librairie JS pour optimiser et analyser la lisibilité des images côté client avec OpenCV.js.",
   "type": "module",
+  "types": "./src/opencv.d.ts",
   "main": "src/index.js",
   "keywords": [
     "opencv",

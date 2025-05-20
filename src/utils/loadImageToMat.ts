@@ -1,11 +1,16 @@
 /// <reference path="../opencv.d.ts" />
 // Charge une image (File, URL, base64) en cv.Mat (RGBA)
 
+/**
+ * Charge une image (File, URL, base64) en cv.Mat (format RGBA).
+ * @param fileOrUrl Fichier image (File) ou URL/base64 (string)
+ * @returns Promise<cv.Mat> (image OpenCV)
+ */
 export function loadImageToMat(fileOrUrl: File | string): Promise<cv.Mat> {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
     img.crossOrigin = "Anonymous";
-    img.onload = async () => {
+    img.onload = () => {
       if (!cv || !cv.Mat) {
         reject(new Error("OpenCV.js not loaded"));
         return;
@@ -20,11 +25,11 @@ export function loadImageToMat(fileOrUrl: File | string): Promise<cv.Mat> {
       }
       ctx.drawImage(img, 0, 0);
       const imageData = ctx.getImageData(0, 0, img.width, img.height);
-      let mat = new cv.Mat(img.height, img.width, cv.CV_8UC4);
+      const mat = new cv.Mat(img.height, img.width, cv.CV_8UC4);
       mat.data.set(imageData.data);
       resolve(mat);
     };
-    img.onerror = reject;
+    img.onerror = (e) => reject(e);
     if (typeof fileOrUrl === "string") {
       img.src = fileOrUrl;
     } else {

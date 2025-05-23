@@ -2,8 +2,9 @@
 import { optimizeImage } from "./utils/optimizeImage.js";
 import { analyzeImage } from "./analyzer.js";
 import type { ProcessImageResult, ProcessImageOptions } from "./types";
-import { computeSSIM_PSNR } from "./utils/controlQuality.js";
 import { DEFAULT_THRESHOLDS } from "./constants.js";
+import { computeSSIM } from "./utils/computeSSIM.js";
+import { computePSNR } from "./utils/computePSNR.js";
 
 /**
  * Pipeline principal : optimise, analyse et contrôle la qualité d'une image OpenCV.
@@ -31,12 +32,16 @@ export async function processImage(
     minContrast: thresholds.minContrast,
   });
 
-  // Calcul SSIM/PSNR avec seuils dynamiques
-  const { ssim, psnr } = computeSSIM_PSNR({
+  // Calcul du SSIM
+  const ssim = computeSSIM({
     originalMat: mat,
     optimizedMat: optimized.matOptimized,
-    minSSIM: thresholds.minSSIM,
-    minPSNR: thresholds.minPSNR,
+  });
+
+  // Calcul du PSNR
+  const psnr = computePSNR({
+    originalMat: mat,
+    optimizedMat: optimized.matOptimized,
   });
 
   // Conversion dataUrl -> Blob pour téléchargement
